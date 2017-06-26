@@ -1,0 +1,810 @@
+<html>
+	<head>
+		<title>StreamMix</title>
+		<link rel="icon" href="/resources/favicon.ico">
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+		<script src="/resources/js.cookie.js"></script>
+		<script>
+			function startedit() {
+				$(".control.add").addClass("editing");
+				$(".zone").addClass("editing");
+				$(".controls").addClass("editing");
+				$("#startedit").hide();
+				$(".dragbar").hide();
+				$(".control.add").show();
+			}
+			function endedit() {
+				$(".editing").removeClass("editing");
+				$("#startedit").show();
+				$(".editor").remove();
+				$(".dragbar").show();
+				$(".control.add").hide();
+			}
+			
+			function openEditor(container) {
+				var zone = container.children('.zone');
+				zone.append('<div class="editor"></div>');
+				container.children('.zone.layout').children('.editor').css('top','-2px');
+				container.children('.zone.empty').children('.editor').css('top','-2px');
+				var editorPanel = zone.children('.editor');
+				editorPanel.append('<div class="control close corner" onclick="closeEditor(this.parentElement);"></div>');
+				setTimeout(function() {editorPanel.addClass('open');});
+				return editorPanel;
+			}
+			function closeEditor(win) {
+				var container = $(win);
+				container.removeClass("open");
+				setTimeout(function() {container.remove();},500);
+			}
+		
+			function openCreator(btn) {
+				var container = btn.parentElement.parentElement;
+				var editorPanel = openEditor($(container));
+				editorPanel.append('<div class="editorarea"></div>');
+				var rect = editorPanel[0].getBoundingClientRect();
+				var fromp = rect.width<302?"top":"left";
+				editorPanel.children('.editorarea')
+					.append('<div class="creatorbutton stream" onclick="editStream(this.parentElement.parentElement,\'\');">STREAM</div>')
+					.append('<div class="creatorbutton chat" style="'+fromp+':33.3%;" onclick="editChat(this.parentElement.parentElement,\'\');">CHAT</div>')
+					.append('<div class="creatorbutton layout"style="'+fromp+':66.6%;" onclick="editLayout(this.parentElement.parentElement,0,0);">LAYOUT</div>');
+				if(rect.width<302) {
+					editorPanel.children('.editorarea').css("width","100px").css("height","300px");
+				}
+			}
+		
+			function editStream(container, prev, prevMode = 0) {
+				$(container).children('.editorarea').remove();
+				$(container).append('<div class="editorarea" style="width:200px; height:200px;"></div>');
+				$(container).children('.editorarea').html('\
+				<p style="position: absolute; left:10px; top:0px; width: 180px; text-align:center">STREAM</p>\
+				<select style="position:absolute;left:10px;top:50px; width:180px;text-align:center;" class="mode"><option value="twitch" '+(prevMode==0?'selected':'')+'>Twitch</option><option value="other" '+(prevMode==1?'selected':'')+'>URL</option></select>\
+				<input type="text" style="position:absolute;left:10px; top:80px; width:180px;text-align:center;" placeholder="Channel" class="channel" value="'+prev+'">\
+				<input type="button" style="position:absolute;left:50px; top:110px; width:100px;text-align:center;" value="SET" onclick="setStream(this.parentElement);">');
+			}
+			function setStream(editorPanel) {
+				var mode = $(editorPanel).children('.mode')[0].selectedIndex;
+				var channel = $(editorPanel).children('.channel')[0].value;
+				editorPanel.parentElement.parentElement.mode = mode;
+				editorPanel.parentElement.parentElement.channel = channel;
+				switch(mode) {
+					case 0: //Twitch
+						loadStream(editorPanel.parentElement.parentElement.parentElement, function(id) {loaders.twitch(id, channel);});
+						break;
+					case 1: //URL
+						loadStream(editorPanel.parentElement.parentElement.parentElement, function(id) {loaders.custom(id, channel);});
+						break;
+				}
+				closeEditor(editorPanel.parentElement);
+			}
+			
+			function editChat(container, prev, prevMode = 0) {
+				$(container).children('.editorarea').remove();
+				$(container).append('<div class="editorarea" style="width:200px; height:200px;"></div>');
+				console.log(prevMode);
+				$(container).children('.editorarea').html('\
+				<p style="position: absolute; left:10px; top:0px; width: 180px; text-align:center">CHAT</p>\
+				<select style="position:absolute;left:10px;top:50px; width:180px;text-align:center;" class="mode"><option value="twitch" '+(prevMode==0?'selected':'')+'>Twitch</option><option value="other" '+(prevMode==1?'selected':'')+'>URL</option></select>\
+				<input type="text" style="position:absolute;left:10px; top:80px; width:180px;text-align:center;" placeholder="Channel" class="channel" value="'+prev+'">\
+				<input type="button" style="position:absolute;left:50px; top:110px; width:100px;text-align:center;" value="SET" onclick="setChat(this.parentElement);">');
+			}
+			function setChat(editorPanel) {
+				var mode = $(editorPanel).children('.mode')[0].selectedIndex;
+				var channel = $(editorPanel).children('.channel')[0].value;
+				editorPanel.parentElement.parentElement.mode = mode;
+				editorPanel.parentElement.parentElement.channel = channel;
+				switch(mode) {
+					case 0: //Twitch
+						loadChat(editorPanel.parentElement.parentElement.parentElement, 'https://twitch.tv/'+channel+'/chat?popout=');
+						break;
+					case 1: //URL
+						loadChat(editorPanel.parentElement.parentElement.parentElement, channel);
+						break;
+				}
+				closeEditor(editorPanel.parentElement);
+			}
+			
+			function editLayout(container, rows, columns) {
+				$(container).children('.editorarea').remove();
+				$(container).append('<div class="editorarea" style="width:200px; height:200px;"></div>');
+				var area = '<p style="position: absolute; left:10px; top:0px; width: 180px; text-align:center">LAYOUT</p><div class="layoutbox">'
+				for(var i=0;i<24;i++) area += '<div class="layoutsel" onmouseenter="updateLayoutEditor(this.parentElement.parentElement,'+Math.floor(i/6+1)+','+(i%6+1)+')" onclick="setLayout(this.parentElement.parentElement,'+Math.floor(i/6+1)+','+(i%6+1)+')"></div>';
+				area += '</div>';
+				area = $(area);
+				if(rows*columns>0)
+					for(var i=0;i<rows;i++)
+						for(var j=0;j<columns;j++)
+							area.children('.layoutsel:nth-child('+(i*6+j+1)+')').addClass('prev');
+				$(container).children('.editorarea').append(area);
+			}
+			function setLayout(editorPanel, rows, columns) {
+				var container = editorPanel.parentElement.parentElement.parentElement;
+				if(rows*columns>0) {
+					createLayout(container, rows, columns);
+				}
+				var zone = $(container).children('.zone')[0];
+				zone.rows = rows;
+				zone.columns = columns;
+				closeEditor(editorPanel.parentElement);
+			}
+			function updateLayoutEditor(editorPanel, rows, columns) {
+				var area = $(editorPanel).children('.layoutbox');
+				area.children('.layoutsel').removeClass('active');
+				for(var i=0;i<rows;i++)
+					for(var j=0;j<columns;j++)
+						area.children('.layoutsel:nth-child('+(i*6+j+1)+')').addClass('active');
+			}
+		
+			function editParent(btn) {
+				var container = $(btn.parentElement.parentElement);
+				if(container.children(".zone").children(".editor").length > 0) { closeEditor(container.children(".zone").children(".editor")[0]); return;}
+				var editorPanel = openEditor(container);
+				if(container.children(".stream").length>0) {
+					editStream(editorPanel[0], container.children(".stream")[0].channel, container.children(".stream")[0].mode);
+				} else if(container.children(".chat").length>0) {
+					editChat(editorPanel[0], container.children(".chat")[0].channel, container.children(".chat")[0].mode);
+				} else if(container.children(".layout").length>0) {
+					editLayout(editorPanel[0], container.children(".layout")[0].rows, container.children(".layout")[0].columns);
+				}
+			}
+			
+			function refreshParent(btn) {
+				var frame = $(btn.parentElement.parentElement).find("iframe")[0];
+				frame.src = frame.src;
+			}
+			
+			function removeParent(btn) {
+				var container = $(btn.parentElement.parentElement);
+				container.children(".zone").addClass("empty").removeClass("stream").removeClass("chat").removeClass("layout").html('<div class="control add editing" onclick="openCreator(this);"></div>');
+				container.children(".controls").children("div:not(.noremove)").remove();
+				//container.find(".control.edit").remove();
+				//container.find(".control.refresh").remove();
+				//container.find(".control.remove").remove();
+			}
+			
+			var playerid = 0;
+			function loadStream(panel, loader) {
+				var container = $(panel);
+				var id = "player"+playerid;
+				container.children(".controls").children("div:not(.noremove)").remove();
+				container.children(".zone").removeClass("empty").addClass("stream").html('<div id="'+id+'"></div>');
+				container.children(".controls").append('<div class="control edit editing" onclick="editParent(this);"></div><div class="control refresh editing" onclick="refreshParent(this);"></div><div class="control remove editing" onclick="removeParent(this);"></div>');
+				loader(id);
+				playerid++;
+			}
+			function loadChat(panel, chatURL) {
+				var container = $(panel);
+				container.children(".controls").children("div:not(.noremove)").remove();
+				container.children(".zone").removeClass("empty").addClass("chat").html('<iframe src="'+chatURL+'" scrolling="no" class="chat_embed" frameborder="0" style="width:100%;height:100%;"></iframe>');
+				container.children(".controls").append('<div class="control edit editing" onclick="editParent(this);"></div><div class="control refresh editing" onclick="refreshParent(this);"></div><div class="control remove editing" onclick="removeParent(this);"></div>');
+			}
+			function createLayout(btn, rows, columns) {
+				var container = $(btn);
+				if(container.children(".zone").hasClass('layout')) {return adjustLayout(btn, rows, columns);}
+				container.children(".controls").children("div:not(.noremove)").remove();
+				container.children(".zone").removeClass("empty").addClass("layout").html('');
+				container.children(".controls").append('<div class="control edit editing" onclick="editParent(this);"></div><div class="control remove editing" onclick="removeParent(this);"></div>');
+				var rowss = Math.floor(1000/rows);
+				var rowfix = 1000-rowss*rows;
+				var columnss = Math.floor(1000/columns);
+				var columnsfix = 1000-columnss*columns;
+				for(var row=0; row<rows; row++) {
+					for(var column=0; column<columns; column++) {
+						var fixc = column==columns-1?columnsfix:0;
+						var fixr = row==rows-1?rowfix:0;
+						var subcontainer = $('<div class="container" style="width:'+(columnss+fixc)/10+'%;height:'+(rowss+fixr)/10+'%;"><div class="zone empty editing"><div class="control add editing" onclick="openCreator(this);"></div></div><div class="controls editing"></div></div>');
+						subcontainer[0].width = (columnss+fixc)/10;
+						subcontainer[0].height = (rowss+fixr)/10;
+						container.children(".zone").append(subcontainer);
+					}
+				}
+				
+				for(var row = 0; row<rows-1; row++) {
+					var percent = (rowss*(row+1))/10;
+					var bar = $('<div class="dragbar" style="top:'+percent+'%;width:100%;height:6px;cursor: n-resize; display:none;transform:translate(0%,-50%);"></div>');
+					bar[0].bartype = 0;
+					bar[0].barpercent = percent;
+					bar[0].barid = row;
+					container.children(".zone").append(bar);
+				}
+				for(var column = 0; column<columns-1; column++) {
+					var percent = (columnss*(column+1))/10;
+					var bar = $('<div class="dragbar" style="left:'+percent+'%;width:6px;height:100%;cursor: e-resize; display:none;transform:translate(-50%,0%);"></div>');
+					bar[0].bartype = 1;
+					bar[0].barpercent = percent;
+					bar[0].barid = column;
+					container.children(".zone").append(bar);
+				}
+				
+				$(".dragbar").mousedown(onMouseDown);
+			}
+			
+			function adjustLayout(btn, nrows, ncolumns) {
+				var container = $(btn);
+				container.children('.zone').children('.dragbar').remove(); //we recreate them later.
+				var zone = container.children('.zone')[0];
+				//Adjust columns
+				if(zone.columns < ncolumns) {
+					var cl = zone.children;
+					var l = []; for(var h in cl) l.push(cl[h]); console.log(l);
+					var lasts = [];
+					for(var i=0;i<zone.rows;i++) {
+						lasts[i] = zone.children[i*zone.columns + zone.columns - 1];
+					}
+					for(var i=0;i<zone.rows;i++) {
+						for(var j=0;j<ncolumns-zone.columns;j++) {
+							zone.insertBefore($('<div class="container"><div class="zone empty editing"><div class="control add editing" onclick="openCreator(this);"></div></div><div class="controls editing"></div></div>')[0],lasts[i].nextSibling);
+						}
+					}
+					var l = []; for(var h in cl) l.push(cl[h]); console.log(l);
+				} else {
+					for(var i=zone.children.length-1;i>=0;i--) {
+						if(i%zone.columns>=ncolumns) {
+							zone.children[i].remove();
+						}
+					}
+				}
+				zone.columns = ncolumns;
+				//Adjust rows
+				if(zone.rows < nrows) {
+					for(var i=0;i<(nrows-zone.rows)*ncolumns;i++) {
+						zone.append($('<div class="container"><div class="zone empty editing"><div class="control add editing" onclick="openCreator(this);"></div></div><div class="controls editing"></div></div>')[0]);
+					}
+				} else {
+					for(var i=zone.rows*ncolumns-1;i>=0;i--) {
+						if(i>=nrows*ncolumns) {
+							zone.children[i].remove();
+						}
+					}
+				}
+				zone.rows = nrows;
+				
+				var rowss = Math.floor(1000/nrows);
+				var rowfix = 1000-rowss*nrows;
+				var columnss = Math.floor(1000/ncolumns);
+				var columnsfix = 1000-columnss*ncolumns;
+				for(var row=0; row<nrows; row++) {
+					for(var column=0; column<ncolumns; column++) {
+						var fixc = column==ncolumns-1?columnsfix:0;
+						var fixr = row==nrows-1?rowfix:0;
+						var subcontainer = $(zone).children('.container')[row*ncolumns+column];
+						subcontainer.width = (columnss+fixc)/10;
+						subcontainer.height = (rowss+fixr)/10;
+						$(subcontainer).css('width',(columnss+fixc)/10+'%').css('height',(rowss+fixr)/10+'%');
+					}
+				}
+				
+				for(var row = 0; row<nrows-1; row++) {
+					var percent = (rowss*(row+1))/10;
+					var bar = $('<div class="dragbar" style="top:'+percent+'%;width:100%;height:6px;cursor: n-resize; display:none;transform:translate(0%,-50%);"></div>')[0];
+					bar.bartype = 0;
+					bar.barpercent = percent;
+					bar.barid = row;
+					zone.append(bar);
+				}
+				for(var column = 0; column<ncolumns-1; column++) {
+					var percent = (columnss*(column+1))/10;
+					var bar = $('<div class="dragbar" style="left:'+percent+'%;width:6px;height:100%;cursor: e-resize; display:none;transform:translate(-50%,0%);"></div>')[0];
+					bar.bartype = 1;
+					bar.barpercent = percent;
+					bar.barid = column;
+					zone.append(bar);
+				}
+				
+				$(".dragbar").mousedown(onMouseDown);
+				$(zone).append($(zone).children('.editor'));//hack to avoid the editor getting in the way, this is stupid and I need to find a real fix.
+			}
+			
+			var moving = {active:false};
+			function updateMove(x, y) {
+				if(moving.active) {
+					if(moving.dir==0) {
+						var dist = Math.floor(Math.max(Math.min((y - moving.rect.top)/(moving.rect.bottom - moving.rect.top)*1000,moving.max),moving.min));
+						$(moving.bar).css('top',dist/10+'%');
+						moving.bar.barpercent = dist/10;
+						for(var i=0;i<moving.left.length;i++) {
+							moving.left[i].height = dist/10 - moving.start;
+							$(moving.left[i]).css('height',(dist/10 - moving.start)+'%');
+							moving.right[i].height = moving.span - (dist/10 - moving.start);
+							$(moving.right[i]).css('height',(moving.span - (dist/10 - moving.start))+'%');
+						}
+					} else {
+						var dist = Math.floor(Math.max(Math.min((x - moving.rect.left)/(moving.rect.right - moving.rect.left)*1000,moving.max),moving.min));
+						$(moving.bar).css('left',dist/10+'%');
+						moving.bar.barpercent = dist/10;
+						for(var i=0;i<moving.left.length;i++) {
+							moving.left[i].width = dist/10 - moving.start;
+							$(moving.left[i]).css('width',(dist/10 - moving.start)+'%');
+							moving.right[i].width = moving.span - (dist/10 - moving.start);
+							$(moving.right[i]).css('width',(moving.span - (dist/10 - moving.start))+'%');
+						}
+					}
+				}
+			}
+			function onMouseDown(e) {
+				$("#dragging").show();
+				moving.active = true;
+				var rect = this.parentElement.getBoundingClientRect();
+				moving.rect = rect;
+				moving.origin = {x:e.originalEvent.clientX,y:e.originalEvent.clientY};
+				moving.dir = this.bartype;
+				moving.bar = this;
+				
+				moving.left = [];
+				moving.right = [];
+				var rows = this.parentElement.rows;
+				var columns = this.parentElement.columns;
+				var containers = $(this.parentElement).children('.container');
+				for(var row=0; row<rows; row++) {
+					for(var column=0; column<columns; column++) {
+						if(moving.dir==0) {
+							if(row==this.barid) {moving.left.push(containers[row*columns + column]);}
+							if(row==this.barid+1) {moving.right.push(containers[row*columns + column]);}
+						} else {
+							if(column==this.barid) {moving.left.push(containers[row*columns + column]);}
+							if(column==this.barid+1) {moving.right.push(containers[row*columns + column]);}
+						}
+					}
+				}
+				moving.span = moving.dir==0?(moving.left[0].height + moving.right[0].height):(moving.left[0].width + moving.right[0].width);
+				moving.start = moving.bar.barpercent - (moving.dir==0?moving.left[0].height:moving.left[0].width);
+				moving.min = moving.start*10+10;
+				moving.max = (moving.start + moving.span)*10-10;
+			}
+			$(document).mouseup(function(e) {
+				$("#dragging").hide();
+				moving.active = false;
+			});
+			$(document).mousemove(function(e) {
+				if(!moving.active) {return;}
+				updateMove(e.originalEvent.clientX, e.originalEvent.clientY);
+			});
+			
+			loaders = {};
+			loaders.twitch = function(id, channel) {
+				/*new Twitch.Player(id, {
+					width:0,height:0,channel:channel
+				});
+				$("#"+id).children('iframe').css('width','100%').css('height','100%');*/
+				$("#"+id).html('<iframe src="https://player.twitch.tv/?channel='+channel+'" frameborder="0" style="width:100%;height:100%;"></iframe>');
+			}
+			loaders.custom = function(id, url) {
+				$("#"+id).html('<iframe src="'+url+'" frameborder="0" style="width:100%;height:100%;"></iframe>');
+			}
+			
+			function serializeElement(el) { //perform on a container (ie. body)
+				var relatedzone = $(el).children('.zone')[0];
+				var output = '';
+				if(relatedzone.classList.contains('layout')) {
+					output += '<layout data="'+relatedzone.rows+' '+relatedzone.columns;
+					for(var i=0;i<relatedzone.rows;i++)
+						output += ' '+relatedzone.children[i*parseInt(relatedzone.columns)].height;
+					for(var i=0;i<relatedzone.columns;i++)
+						output += ' '+relatedzone.children[i].width;
+					output += '">';
+					for(var i=0;i<relatedzone.rows;i++)
+						for(var j=0;j<relatedzone.columns;j++)
+							output += serializeElement(relatedzone.children[i*relatedzone.columns+j]);
+					output += '</layout>';
+				} else if (relatedzone.classList.contains('stream')) {
+					output += '<stream mode="'+relatedzone.mode+'" source="'+relatedzone.channel+'"/>';
+				} else if (relatedzone.classList.contains('chat')) {
+					output += '<chat mode="'+relatedzone.mode+'" source="'+relatedzone.channel+'"/>';
+				} else {
+					output += '<empty/>';
+				}
+				return output;
+			}
+			function loadSavedLayout(xml) {
+				var tree = (new DOMParser()).parseFromString(xml,'text/xml');
+				var processnode;
+				processnode = function(node, container) {
+					switch(node.tagName) {
+						case 'layout':
+							var data = node.getAttribute("data").split(" ");
+							var rows = parseInt(data[0]);
+							var columns = parseInt(data[1]);
+							var heights = []; for(var i=0;i<rows;i++) {heights[i]=parseFloat(data[2+i]);}
+							var widths = []; for(var i=0;i<columns;i++) {widths[i]=parseFloat(data[2+rows+i]);}
+							createLayout(container, rows, columns);
+							container.children('.zone')[0].rows = rows;
+							container.children('.zone')[0].columns = columns;
+							var containers = container.children('.zone').children('.container');
+							for(var i=0;i<rows;i++) {
+								for(var j=0;j<columns;j++) {
+									var cont = containers[i*columns+j];
+									$(cont).css('width',widths[j]+'%').css('height',heights[i]+'%');
+									cont.width = widths[j];
+									cont.height = heights[i];
+								}
+							}
+							var bars = container.children('.zone').children('.dragbar');
+							var crow = 0;
+							for(var i=0;i<rows-1;i++) {
+								var bar = bars[i];
+								crow += heights[i];
+								$(bar).css('top',crow+'%');
+								bar.barpercent = crow;
+							}
+							var ccolumn = 0;
+							for(var i=0;i<columns-1;i++) {
+								var bar = bars[rows-1+i];
+								ccolumn += widths[i];
+								$(bar).css('left',ccolumn+'%');
+								bar.barpercent = ccolumn;
+							}
+							for(var i=0;i<rows;i++) {
+								for(var j=0;j<columns;j++) {
+									processnode(node.children[i*columns+j],$(containers[i*columns+j]));
+								}
+							}
+							break;
+						case 'stream':
+							var mode = parseInt(node.getAttribute("mode"));
+							var channel = node.getAttribute("source");
+							container.children('.zone')[0].mode = mode;
+							container.children('.zone')[0].channel = channel;
+							switch(mode) {
+								case 0: //Twitch
+									loadStream(container[0], function(id) {loaders.twitch(id, channel);});
+									break;
+								case 1: //URL
+									loadStream(container[0], function(id) {loaders.custom(id, channel);});
+									break;
+							}
+							break;
+						case 'chat':
+							var mode = parseInt(node.getAttribute("mode"));
+							var channel = node.getAttribute("source");
+							container.children('.zone')[0].mode = mode;
+							container.children('.zone')[0].channel = channel;
+							switch(mode) {
+								case 0: //Twitch
+									loadChat(container[0], 'https://twitch.tv/'+channel+'/chat?popout=');
+									break;
+								case 1: //URL
+									loadChat(container[0], channel);
+									break;
+							}
+							break;
+					}
+				}
+				processnode(tree.children[0],$('body'));
+				endedit();
+			}
+			
+			function saveLayout(btn) {
+				var name = $(btn.parentElement).children('.name')[0].value;
+				closeEditor($('body').children('.editor')[0]);
+				Cookies.set(name,serializeElement($('body')[0]));
+			}
+			
+			function loadLayout(btn) {
+				var name = btn.parentElement.children[0].innerHTML;
+				closeEditor($('body').children('.editor')[0]);
+				loadSavedLayout(Cookies.get(name));
+			}
+			
+			function removeLayout(btn) {
+				var name = btn.parentElement.children[0].innerHTML;
+				if(btn.parentElement.previousSibling) btn.parentElement.previousSibling.remove();
+				btn.parentElement.remove();
+				Cookies.remove(name);
+			}
+			
+			function savemenu() {
+				var savePanel = $('<div class="editor" style="position:absolute;left:0px;top:0px;"></div>');
+				$('body').append(savePanel);
+				savePanel.append('<div class="control close corner" onclick="closeEditor(this.parentElement);" style="top:10px"></div>');
+				setTimeout(function() {savePanel.addClass('open');});
+				var savesArea = $('<div class="editorarea" style="width:500px; height:700px;">\
+				<p style="position: absolute; left:10px; top:0px; width: 480px; text-align:center">SAVE CURRENT LAYOUT</p>\
+				<input type="text" style="position:absolute;left:160px; top:50px; width:180px;text-align:center;" placeholder="Save name" class="name">\
+				<input type="button" style="position:absolute;left:200px; top:80px; width:100px;text-align:center;" value="SAVE" onclick="saveLayout(this);">\
+				<p style="position: absolute; left:50px; top:100px; width: 400px; text-align:center; font-size:16; color:#bbb">you can load a saved layout automatically at stream-mix.com/preset/[name]</p>\
+				<p style="position: absolute; left:10px; top:140px; width: 480px; text-align:center">SAVED LAYOUTS</p></div>');
+				var savesList = $('<div style="position:absolute; left:50px; top:200px; width:400px; height:400px; overflow: auto;"></div>');
+				savePanel.append(savesArea.append(savesList));
+				
+				var presets = Cookies.get();
+				var first = true;
+				for(var key in presets) {
+					if(!first) savesList.append('<br>');
+					else first = false;
+					var row = $('<div class="loadentry"><p style="position:absolute;left:10px;width:300px;height:40px">'+key+'</p><div class="loadrmbutton control remove" onclick="removeLayout(this);"></div><div class="loadbutton" onclick="loadLayout(this);">LOAD</div></div>');
+					savesList.append(row);
+				}
+				savesArea.append('<div class="loadbutton" onclick="var a=prompt(\'Enter XML Layout:\');if(a!=null){loadSavedLayout(a);}" style="top: 620px; left: 140px; width: 100;">IMPORT</div><div class="loadbutton" onclick="prompt(\'XML Layout:\',serializeElement($(\'body\')[0]));" style="top: 620px; left: 260px; width: 100;">EXPORT</div>');
+			}
+			
+			
+			var overrideparams;
+		</script>
+		<!--LOADOVERRIDE-->
+		<script>
+			var hardpresets = [
+				'<layout data="1 2 100 80 20"><stream mode="0" source="$1"/><chat mode="0" source="$1"/></layout>', //1
+				'<layout data="1 3 100 46 27 27"><layout data="2 1 50 50 100"><stream mode="0" source="$1"/><stream mode="0" source="$2"/></layout><chat mode="0" source="$1"/><chat mode="0" source="$2"/></layout>', //2
+				'<layout data="2 2 50 50 50 50"><stream mode="0" source="$1"/><stream mode="0" source="$2"/><stream mode="0" source="$3"/><layout data="1 3 100 33.3 33.3 33.4"><chat mode="0" source="$1"/><chat mode="0" source="$2"/><chat mode="0" source="$3"/></layout></layout>', //3
+				'<layout data="1 2 100 72 28"><layout data="2 2 50 50 50 50"><stream mode="0" source="$1"/><stream mode="0" source="$2"/><stream mode="0" source="$3"/><stream mode="0" source="$4"/></layout><layout data="2 2 50 50 50 50"><chat mode="0" source="$1"/><chat mode="0" source="$2"/><chat mode="0" source="$3"/><chat mode="0" source="$4"/></layout></layout>', //4
+				'<layout data="1 3 100 45 30 25"><layout data="2 1 50 50 100"><stream mode="0" source="$1"/><stream mode="0" source="$2"/></layout><layout data="3 1 33.3 33.3 33.4 100"><stream mode="0" source="$3"/><stream mode="0" source="$4"/><stream mode="0" source="$5"/></layout><layout data="2 1 50 50 100"><chat mode="0" source="$1"/><chat mode="0" source="$2"/></layout></layout>' //5
+			];
+			window.onload = function() {
+				var params_list = document.location.search.substring(1).split('&');
+				var params = {};
+				for(var i=0;i<params_list.length;i++) {
+					var parts = params_list[i].split('=');
+					params[parts[0]] = parts[1];
+				}
+				if(overrideparams) {params=overrideparams;}
+				if(params.hasOwnProperty("preset") && Cookies.get(params.preset)) {
+					loadSavedLayout(Cookies.get(params.preset));
+				} else if(params.hasOwnProperty("chat") && params.chat) {
+					var names = params.chat.split(',');
+					if(names.length>0) {
+						createLayout($('body')[0], 1, names.length);
+					}
+					var zone = $('body').children('.zone')[0];
+					for(var i=0;i<names.length;i++) {
+						var szone = zone.children[i].children[0];
+						var channel = names[i];
+						szone.mode = 0;
+						szone.channel = channel;
+						loadChat(szone.parentElement, 'https://twitch.tv/'+channel+'/chat?popout=');
+					}
+				} else if(params.hasOwnProperty("streamers") && params.streamers) {
+					var names = params.streamers.split(',');
+					if(names.length<=hardpresets.length) {
+						var preset = hardpresets[names.length-1];
+						for(var i=0;i<names.length;i++) {
+							preset = preset.split('$'+(i+1)).join(names[i]);
+						}
+						loadSavedLayout(preset);
+					}
+				} else {
+					setTimeout(startedit, 500);
+				}
+				endedit();
+			}
+		</script>
+		<style>
+body {
+	margin:0px;
+	background-color: black;
+	overflow: hidden;
+	width: 100%;
+	height: 100%;
+}
+
+.control {
+	cursor: pointer;
+	position: relative;
+	float:left;
+	left: 4px;
+	background-color: #fff;
+	width:32px;
+	height:32px;
+	margin: 2px 0px;
+}
+.control:active {
+	background-color: #359;
+}
+
+.control.add.editing {
+	opacity: 1;
+	transition: opacity 250ms;
+}
+.control.add {
+	opacity: 0;
+	-webkit-mask-box-image:url('/resources/add.svg');
+	mask: url('/resources/add.svg') 0/96px;
+    margin: 0;
+    position: relative;
+	width: 96px;
+	height: 96px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.control.close {-webkit-mask-box-image:url('/resources/close.svg'); mask: url('/resources/close.svg') 0/32px;}
+.control.remove {-webkit-mask-box-image:url('/resources/remove.svg'); mask: url('/resources/remove.svg') 0/32px;}
+.control.edit {-webkit-mask-box-image:url('/resources/edit.svg'); mask: url('/resources/edit.svg') 0/32px;}
+.control.refresh {-webkit-mask-box-image:url('/resources/refresh.svg'); mask: url('/resources/refresh.svg') 0/32px;}
+.control.save {-webkit-mask-box-image:url('/resources/save.svg'); mask: url('/resources/save.svg') 0/32px;}
+
+.control.edit.globalcontrol {
+	position: fixed;
+	top: 4px;
+	left: calc(100% - 36px);
+	background-color: rgba(255,255,255,0.25);
+}
+.control.edit.globalcontrol:hover {
+	background-color: #fff;
+}
+.control.edit.globalcontrol:active {
+	background-color: #359;
+}
+
+.control.corner {
+	float: none;
+	position: relative;
+	top: 4px;
+	left: calc(100% - 36px);
+}
+
+.controls {
+	opacity: 0;
+	display: none;
+	position: relative;
+	float: right;
+	right: 0px;
+	top: calc(-100% + 10px);
+	width: 40px;
+	transition: opacity 250ms, display 250ms;
+}
+
+.controls.globalcontrols {
+	position: absolute;
+	right: 0px;
+	top: 10px;
+}
+
+.controls.editing {
+	display: block;
+	opacity: 1;
+}
+
+.container {
+	float: left;
+}
+
+.zone {
+	position: relative;
+	--margin: 0px;
+	background-color: #101010;
+	border: 2px solid #050810;
+	margin: calc(var(--margin)/4) var(--margin) calc(var(--margin)/4)  calc(var(--margin)/4);
+	width: calc(100% - var(--margin)*1.25 - 4px);
+	height: calc(100% - var(--margin)/2 - 4px);
+	transition: margin 250ms, width 250ms, height 250ms, background-color 250ms;
+}
+
+@property --margin {
+  syntax: "<stuff>";
+  initial-value: 0px;
+  inherits: false;
+}
+.zone.editing {
+	--margin: 40px;
+}
+.zone.empty {
+	background-color: #000;
+}
+.zone.editing.empty {
+	background-color: #111520;
+	--margin: 40px;
+}
+
+.editor {
+	position: relative;
+	left: 0px;
+	top: calc(-100% - 2px);
+	width: 100%;
+	height: 100%;
+	background-color: rgba(0,0,0,0.8);
+	opacity: 0;
+	transition: opacity 150ms;
+}
+.editor.open {
+	opacity: 1;
+}
+.editorarea {
+	position: relative;
+    left: 50%;
+    top: calc(50% - 34px);
+	width: 300px;
+	height: 100px;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-family: "consolas";
+    font-weight: bold;
+    font-size: 20;
+    color: #fff;
+}
+.creatorbutton {
+	cursor: pointer;
+	background-color: #fff;
+	width: 100px;
+	height: 100px;
+	position: fixed;
+	vertical-align: middle;
+}
+.creatorbutton.stream {-webkit-mask-box-image: url(/resources/mode_stream.svg); mask: url('/resources/mode_stream.svg') 0/100px; line-height: 100px;}
+.creatorbutton.chat {-webkit-mask-box-image: url(/resources/mode_chat.svg); mask: url('/resources/mode_chat.svg') 0/100px; line-height: 75px;}
+.creatorbutton.layout {-webkit-mask-box-image: url(/resources/mode_layout.svg); mask: url('/resources/mode_layout.svg') 0/100px; line-height: 55px;}
+.creatorbutton:hover {
+	background-color: #ddd;
+    color: #000;
+}
+.creatorbutton:active {
+	background-color: #359;
+    color: #000;
+}
+
+.layoutbox {
+    position: absolute;
+    left: 10px;
+    top: 50px;
+    width: 180px;
+    height: 120px;
+    margin: -2;
+}
+.layoutsel {
+    float: left;
+    width: 26;
+    height: 26;
+    background-color: rgba(255,255,255,0.3);
+    cursor: pointer;
+    margin: 2;
+}
+.layoutsel.active { background-color: #88a; }
+.layoutsel.active.prev { background-color: #aaf; }
+.layoutsel.prev { background-color: #eee; }
+
+.dragbar {
+	position: absolute;
+	z-index: 2;
+	background-color: #101010;
+}
+
+.loadentry {
+	position: relative;
+	width: 396px;
+	height: 40px;
+	border: 2px solid #fff;
+	text-align: left;
+	line-height: 0%;
+}
+
+.loadbutton {
+	position: absolute;
+	right: 0px;
+	top: 0px;
+	width: 75px;
+	height: 40px;
+	background-color: #fff;
+    color: black;
+    line-height: 200%;
+    text-align: center;
+    cursor: pointer;
+}
+.loadbutton:hover {
+	background-color: #888;
+}
+.loadbutton:active {
+	background-color: #359;
+}
+
+.loadrmbutton {
+    position: absolute;
+    top: 2px;
+    float: none;
+    left: 286;
+}
+.loadrmbutton:hover {
+	background-color: #888;
+}
+.loadrmbutton:active {
+	background-color: #359;
+}
+
+		</style>
+	</head>
+	<body>
+		<div id="dragging" style="position:absolute;width:100%;height:100%;display:none;z-index: 1;"></div>
+		<div class="zone empty">
+			<div class="control add" onclick="openCreator(this);"></div></div>
+		</div>
+		<div class="controls globalcontrols"><div class="control close noremove" onclick="endedit();"></div><div class="control save noremove" onclick="savemenu();"></div></div>
+		<div id="startedit" class="control edit globalcontrol noremove" onclick="startedit();"></div>
+	</body>
+</html>

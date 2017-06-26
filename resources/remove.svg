@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" version="1.1">
+	<g id="l0" transform="translate(0,0)">
+		<circle id="circle" cx="256" cy="256" style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:32;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" r="240"/>
+		<path style="fill:#030000;fill-opacity:1;stroke:none;stroke-width:26.88496399;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="M 233.22461 102 L 233.22461 131.08008 L 123 131.08008 L 123 161.08008 L 149.54297 161.08008 L 170.48438 383.86719 L 341.51172 383.86719 L 362.45312 161.08008 L 389 161.08008 L 389 131.08008 L 278.77539 131.08008 L 278.77539 102 L 233.22461 102 z M 204.80078 166.40039 L 217.59961 166.40039 L 230.40039 358.40039 L 217.59961 358.40039 L 204.80078 166.40039 z M 294.40039 166.40039 L 307.19922 166.40039 L 294.40039 358.40039 L 281.59961 358.40039 L 294.40039 166.40039 z " transform="translate(0,0)" id="trash"/>
+	</g>
+</svg>
