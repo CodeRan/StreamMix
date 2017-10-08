@@ -9,6 +9,7 @@
 				$(".control.add").addClass("editing");
 				$(".zone").addClass("editing");
 				$(".controls").addClass("editing");
+				$(".links").addClass("editing");
 				$("#startedit").hide();
 				$(".dragbar").hide();
 				$(".control.add").show();
@@ -611,6 +612,9 @@ body {
 .control.refresh {-webkit-mask-box-image:url('/resources/refresh.svg'); mask: url('/resources/refresh.svg') 0/32px;}
 .control.save {-webkit-mask-box-image:url('/resources/save.svg'); mask: url('/resources/save.svg') 0/32px;}
 
+.control.discord {-webkit-mask-box-image:url('/resources/discord.svg'); mask: url('/resources/discord.svg') 0/32px;}
+.control.github {-webkit-mask-box-image:url('/resources/github.png'); mask: url('/resources/github.png') 0/32px; transform: scale(0.8);}
+
 .control.edit.globalcontrol {
 	position: fixed;
 	top: 4px;
@@ -649,6 +653,22 @@ body {
 }
 
 .controls.editing {
+	display: block;
+	opacity: 1;
+}
+
+.links {
+	opacity: 0;
+	display: none;
+	position: absolute;
+	width: 40px;
+	height: 80px;
+	bottom: 0px;
+	right: 0px;
+	transition: opacity 250ms, display 250ms;
+}
+
+.links.editing {
 	display: block;
 	opacity: 1;
 }
@@ -805,6 +825,7 @@ body {
 			<div class="control add" onclick="openCreator(this);"></div></div>
 		</div>
 		<div class="controls globalcontrols"><div class="control close noremove" onclick="endedit();"></div><div class="control save noremove" onclick="savemenu();"></div></div>
+		<div class="links"><a class="control discord" href="https://discord.gg/mGGDvrw" target="_blank"></a><a class="control github" href="https://www.github.com/CodeRan/StreamMix" target="_blank"></a></div>
 		<div id="startedit" class="control edit globalcontrol noremove" onclick="startedit();"></div>
 	</body>
 </html>
